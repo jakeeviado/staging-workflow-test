@@ -2,7 +2,8 @@ name: Semantic Release
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ master ]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -10,19 +11,89 @@ permissions:
   pull-requests: write
 
 jobs:
-  semantic_release:
+  prepare-release-staging:
     runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip staging]') && !contains(github.event.head_commit.message, 'chore(release-staging):')"
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'adopt'
           java-version: '17'
-      - name: Install semantic-release
+
+      - name: Install semantic-release plugins
         run: npm install semantic-release @semantic-release/git @semantic-release/changelog @semantic-release/github @semantic-release/exec @semantic-release/commit-analyzer conventional-changelog-conventionalcommits
+
+      - name: Configure Git
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+      - name: Run release staging script
+        run: |
+          chmod +x ./release-staging.sh
+          ./release-staging.sh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Comment on commits
+        run: |
+          NEXT_VERSION=$(npx semantic-release --dry-run 2>&1 | grep -oP "The next release version is \K[^\s]+" | head -1 || echo "")
+          if [ -n "$NEXT_VERSION" ]; then
+            gh api repos/${{ github.repository }}/commits/${{ github.sha }}/comments \
+              --method POST \
+              --field body=" Release staging prepared for version $NEXT_VERSION
+          
+            [View Release Staging PR](https://github.com/${{ github.repository }}/pulls?q=is%3Apr+head%3Arelease-staging)" || echo "Could not create comment"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
+  semantic_release:
+    runs-on: ubuntu-latest
+    if: contains(github.event.head_commit.message, 'chore(release-staging):')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'adopt'
+          java-version: '17'
+
+      - name: Install semantic-release plugins
+        run: npm install semantic-release @semantic-release/git @semantic-release/changelog @semantic-release/github @semantic-release/exec @semantic-release/commit-analyzer conventional-changelog-conventionalcommits
+
       - name: Semantic release
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         run: npx semantic-release
+
+      - name: Clean up staging branch
+        run: |
+          # Delete the staging branch since release is complete
+          git push origin --delete release-staging || echo "Staging branch already deleted"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
