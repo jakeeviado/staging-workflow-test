@@ -20,16 +20,9 @@ else
     git checkout -b "$RELEASE_BRANCH"
 fi
 
-echo "Running semantic-release in dry-run mode to prepare release artifacts..."
+git clean -fd
 
-export CI=true
-export GITHUB_ACTIONS=true
-
-echo "Generating release artifacts with semantic-release..."
-npx semantic-release --dry-run --no-ci 2>/dev/null || {
-    echo "Semantic-release dry-run completed, checking for generated files..."
-}
-
+echo "Running semantic-release in dry-run mode to determine next version..."
 NEXT_VERSION=$(npx semantic-release --dry-run 2>&1 | grep -oP "The next release version is \K[^\s]+" | head -1 || echo "")
 
 if [ -z "$NEXT_VERSION" ]; then
@@ -48,16 +41,17 @@ if [ -f "pom.xml" ]; then
 fi
 
 echo "Generating changelog..."
-npx semantic-release --dry-run --no-ci >/dev/null 2>&1 || true
-
-
 echo "## [$NEXT_VERSION] - $(date +%Y-%m-%d)" | cat - CHANGELOG.md > temp && mv temp CHANGELOG.md
 
-echo "Staging release artifacts"
-git add -A
+echo "Staging release artifacts: pom.xml and CHANGELOG.md"
+git add pom.xml
+git add CHANGELOG.md
+
+echo "Files staged for commit:"
+git diff --staged --name-only
 
 if git diff --staged --quiet; then
-    echo "No changes to stage for release $NEXT_VERSION"
+    echo "No relevant changes to stage for release $NEXT_VERSION (pom.xml/CHANGELOG.md)"
     git checkout "$BASE_BRANCH"
     exit 0
 else
@@ -76,73 +70,11 @@ echo "Pushing release staging branch to origin"
 git push origin "$RELEASE_BRANCH" --force-with-lease
 
 echo "Managing GitHub Pull Request"
-if command -v gh &> /dev/null; then
-    existing_pr=$(gh pr list --head "$RELEASE_BRANCH" --base "$BASE_BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
 
-    if [ -n "$existing_pr" ] && [ "$existing_pr" != "null" ]; then
-        echo "Updating existing Pull Request #$existing_pr"
-        gh pr edit "$existing_pr" \
-            --title "🚀 Release Staging: $NEXT_VERSION" \
-            --body "## Release Staging for Version $NEXT_VERSION
-
-This PR contains the prepared release artifacts for version \`$NEXT_VERSION\`.
-
-### Changes Included:
-- Version bump to \`$NEXT_VERSION\`
-- Updated CHANGELOG.md
-- All commits from master branch
-
-### Review Checklist:
-- [ ] Version number is correct
-- [ ] Changelog entries are accurate
-- [ ] All intended commits are included
-- [ ] No unintended changes
-
-**Note:** This is a staging branch. After approval, the actual release will be created from master branch.
-
----
-*This PR is automatically managed by the release staging script*"
-    else
-        echo "Creating new Pull Request for release staging"
-        gh pr create \
-            --title "🚀 Release Staging: $NEXT_VERSION" \
-            --body "## Release Staging for Version $NEXT_VERSION
-
-This PR contains the prepared release artifacts for version \`$NEXT_VERSION\`.
-
-### Changes Included:
-- Version bump to \`$NEXT_VERSION\`
-- Updated CHANGELOG.md
-- All commits from master branch
-
-### Review Checklist:
-- [ ] Version number is correct
-- [ ] Changelog entries are accurate
-- [ ] All intended commits are included
-- [ ] No unintended changes
-
-**Note:** This is a staging branch. After approval, the actual release will be created from master branch.
-
----
-*This PR is automatically managed by the release staging script*" \
-            --base "$BASE_BRANCH" \
-            --head "$RELEASE_BRANCH"
-    fi
-else
-    echo "Warning: GitHub CLI ('gh') not found. Please install it to automatically manage Pull Requests."
-    echo "You'll need to create/update the Pull Request manually for branch '$RELEASE_BRANCH'."
-fi
-
-echo "✅ Release staging complete!"
-echo "📋 Summary:"
+echo " Release staging complete!"
+echo " Summary:"
 echo "   - Branch: $RELEASE_BRANCH"
 echo "   - Version: $NEXT_VERSION"
 echo "   - Status: Ready for review"
-echo ""
-echo "🔄 Next steps:"
-echo "   1. Review the Pull Request"
-echo "   2. Get approval from code reviewers"
-echo "   3. Merge the PR to trigger actual release"
 
-# Switch back to master
 git checkout "$BASE_BRANCH"
