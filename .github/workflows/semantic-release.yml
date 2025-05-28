@@ -84,7 +84,7 @@ jobs:
           java-version: '17'
 
       - name: Install semantic-release plugins
-        run: npm install semantic-release @semantic-release/git @semantic-release/changelog @semantic-release/github @semantic-release/exec @semantic-release/commit-analyzer conventional-changelog-conventionalcommits
+        run: npm install semantic-release @semantic-release/git @semantic-release/changelog @semantic-release/github @semantic-release/exec @semantic-release/commit-analyzer conventional-changelog-conventionalcommits@7.0.2
 
       - name: Semantic release
         env:
