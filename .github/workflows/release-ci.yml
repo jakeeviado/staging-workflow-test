@@ -42,8 +42,8 @@ jobs:
 
       - name: Run release staging script
         run: |
-          chmod +x ./release-staging.sh
-          ./release-staging.sh
+          chmod +x .github/workflows/release-staging.sh
+          .github/workflows/release-staging.sh
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
