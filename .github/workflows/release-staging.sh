@@ -5,12 +5,12 @@ set -e
 BASE_BRANCH="master"
 RELEASE_BRANCH="release-staging"
 
-echo "Switching to $BASE_BRANCH and pulling latest changes"
+echo "switching to $BASE_BRANCH and pulling latest changes"
 git checkout "$BASE_BRANCH"
 git pull origin "$BASE_BRANCH"
 
 if git show-ref --verify --quiet refs/heads/$RELEASE_BRANCH; then
-    echo "Release staging branch exists. Updating it..."
+    echo "Release staging branch exists, updating..."
     git checkout "$RELEASE_BRANCH"
 
     echo "Resetting release staging branch to master"
