@@ -7,6 +7,10 @@ target/
 /logs
 /lib/
 /build/
+/node_modules
+package-lock.json
+package.json
+
 
 ### IntelliJ IDEA ###
 .idea/modules.xml
