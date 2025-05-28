@@ -40,3 +40,5 @@ plugins:
   - - "@semantic-release/changelog"
     - changelogFile: CHANGELOG.md
       changelogTitle: "# Changelogs"
+
+  - - "@semantic-release/github"
